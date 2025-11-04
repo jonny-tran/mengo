@@ -1,16 +1,9 @@
-// Vị trí: apps/web/proxy.ts
-
-import { NextRequest } from 'next/server'
-// ĐÃ SỬA: Import từ file utility 'proxy' mới
-import { createProxyClient } from '@/proxy'
+// Simulated proxy - not used in prototype
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function proxy(request: NextRequest) {
-  // ĐÃ SỬA: Gọi hàm 'createProxyClient'
-  const { supabase, response } = createProxyClient(request)
-  
-  await supabase.auth.getSession()
-  
-  return response
+  // In prototype, return a simple response
+  return NextResponse.json({ message: 'Proxy not used in prototype' }, { status: 200 })
 }
 
 export const config = {

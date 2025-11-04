@@ -10,7 +10,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { signInWithGoogle } from "@/app/auth/actions";
+// import { signInWithGoogle } from "@/app/auth/actions"; // Simulated - not used in prototype
 import Link from "next/link";
 
 export function LoginForm({
@@ -52,9 +52,8 @@ export function LoginForm({
           <Field>
             <Button
               variant="outline"
-              type="submit"
-              formAction={signInWithGoogle}
-              formNoValidate
+              type="button"
+              onClick={() => window.location.href = '/app/guest'}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -62,7 +61,7 @@ export function LoginForm({
                   fill="currentColor"
                 />
               </svg>
-              Continue with Google
+              Continue as Guest (Prototype)
             </Button>
           </Field>
         </FieldGroup>
