@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { BreadcrumbSetter } from "@/components/space/dashboard/breadcrumb-context";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -12,11 +10,38 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { Epic, Hint, Project, Task } from "@/lib/mock-data";
 import { database } from "@/lib/mock-data";
-import type { Project, Epic, Task, Hint } from "@/lib/mock-data";
+import { ALL_PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 import Link from "next/link";
-import { BreadcrumbSetter } from "@/components/space/dashboard/breadcrumb-context";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  ShoppingCart,
+  BookOpen,
+  PenSquare,
+  Sparkles,
+  Blocks,
+  Layout,
+  NotebookPen,
+} from "lucide-react";
 
 interface HintData {
   level?: "metacognitive" | "conceptual" | "keywords";
@@ -41,8 +66,87 @@ interface PlanResponse {
 
 export default function AppDashboardPage() {
   const router = useRouter();
-  const [brief, setBrief] = useState("");
+  const [briefContent, setBriefContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+
+  // No hard limit for brief length
+
+  const handleTextareaKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      e.key === "Enter" &&
+      !isGenerating &&
+      briefContent.trim()
+    ) {
+      e.preventDefault();
+      void handleGenerate();
+    }
+  };
+
+  // Hotkey: Alt + T (and fallback Ctrl + /) to open template palette
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isAltT =
+        e.altKey && (e.key.toLowerCase() === "t" || e.code === "KeyT");
+      const isCtrlSlash = e.ctrlKey && (e.key === "/" || e.code === "Slash");
+      if (isAltT || isCtrlSlash) {
+        e.preventDefault();
+        setTemplateOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Group templates by category for palette
+  const templatesByCategory = useMemo(() => {
+    const map = new Map<string, typeof ALL_PROMPT_TEMPLATES>();
+    ALL_PROMPT_TEMPLATES.forEach((t) => {
+      const list = map.get(t.category) ?? [];
+      list.push(t);
+      map.set(t.category, list);
+    });
+    return map;
+  }, []);
+
+  const categoryIcon = (cat: string) => {
+    const lower = cat.toLowerCase();
+    if (lower.includes("mini-app")) return Blocks;
+    if (lower.includes("frontend")) return Layout;
+    if (lower.includes("fullstack")) return NotebookPen;
+    return Sparkles;
+  };
+
+  const formatRelativeTime = (iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const sec = Math.floor(diffMs / 1000);
+    const min = Math.floor(sec / 60);
+    const hr = Math.floor(min / 60);
+    const day = Math.floor(hr / 24);
+    if (day > 0) return `${day}d ago`;
+    if (hr > 0) return `${hr}h ago`;
+    if (min > 0) return `${min}m ago`;
+    return "just now";
+  };
+
+  const ProjectBadgeIcon = ({ title }: { title: string }) => {
+    const lower = title.toLowerCase();
+    const Icon = /e-?commerce|shop|mug/.test(lower)
+      ? ShoppingCart
+      : /study|planner|learn/.test(lower)
+        ? BookOpen
+        : /blog|write|editor/.test(lower)
+          ? PenSquare
+          : Sparkles;
+    return (
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <Icon size={12} />
+      </span>
+    );
+  };
 
   // Mock lịch sử projects của người dùng (tạm thời hard-code tại đây)
   const recentProjects: Array<
@@ -69,7 +173,7 @@ export default function AppDashboardPage() {
   ];
 
   const handleGenerate = async () => {
-    if (!brief.trim()) {
+    if (!briefContent.trim()) {
       toast.error("Please enter a project brief");
       return;
     }
@@ -83,7 +187,7 @@ export default function AppDashboardPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          brief: brief.trim(),
+          brief: briefContent.trim(),
           template: "default",
           simulate_success: true,
         }),
@@ -110,7 +214,7 @@ export default function AppDashboardPage() {
       const project: Project = {
         id: projectId,
         title: plan.project_title,
-        brief: brief.trim(),
+        brief: briefContent.trim(),
         ownerId: guestUserId,
         createdAt: new Date().toISOString(),
       };
@@ -196,18 +300,21 @@ export default function AppDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="min-h-screen bg-background page-gradient-bg p-4 md:p-8">
       <div className="mx-auto max-w-4xl">
         <BreadcrumbSetter items={[{ label: "Workspace", href: "/space" }]} />
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">Mengo</h1>
-          <p className="text-muted-foreground">
-            Transform project briefs into plans with AI-generated epics, tasks
-            and hints
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 gradient-title tracking-tight leading-[1.2] md:leading-[1.15] pb-1 md:pb-1.5">
+            Task by Task
+          </h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Turn vague ideas into clear, actionable plans with organized epics,
+            detailed tasks, and helpful hints.
           </p>
         </div>
 
-        <Card>
+        {/* Premium Card with mesh gradient, soft shadow, and border */}
+        <Card className="mesh-gradient-bg shadow-2xl border border-primary/20 rounded-2xl transition-all duration-200">
           <CardHeader>
             <CardTitle>Paste Project Brief</CardTitle>
             <CardDescription>
@@ -218,17 +325,86 @@ export default function AppDashboardPage() {
           <CardContent className="space-y-4">
             <Textarea
               placeholder="Example: Build a mini e-commerce platform to sell mugs with cart and checkout..."
-              value={brief}
-              onChange={(e) => setBrief(e.target.value)}
-              className="min-h-32"
+              value={briefContent}
+              onChange={(e) => setBriefContent(e.target.value)}
+              onKeyDown={handleTextareaKeyDown}
+              className="min-h-32 focus-visible:ring-2 focus-visible:ring-primary/40"
               disabled={isGenerating}
+              aria-label="Project brief input"
             />
+            <div className="flex items-center justify-start text-xs text-muted-foreground">
+              <span>Tip: Press Ctrl/⌘ + Enter to generate</span>
+            </div>
 
-            <div className="flex gap-2">
+            {/* Command Palette */}
+            <CommandDialog open={templateOpen} onOpenChange={setTemplateOpen}>
+              <div className="px-3 pt-3 pb-2">
+                <div className="text-base font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Choose a
+                  template
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Search by name or browse categories. Press Enter to insert.
+                </p>
+              </div>
+              <CommandInput placeholder="Search templates..." />
+              <CommandList>
+                <CommandEmpty>No templates found.</CommandEmpty>
+                {Array.from(templatesByCategory.entries()).map(
+                  ([cat, items], idx) => {
+                    const Icon = categoryIcon(cat);
+                    return (
+                      <div key={cat}>
+                        {idx > 0 && <CommandSeparator />}
+                        <CommandGroup heading={cat}>
+                          {items.map((t) => (
+                            <CommandItem
+                              key={t.title}
+                              value={`${cat} ${t.title}`}
+                              onSelect={() => {
+                                setBriefContent(t.prompt);
+                                setTemplateOpen(false);
+                              }}
+                              className="items-start gap-3"
+                            >
+                              <Icon className="mt-0.5 h-4 w-4 text-primary" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-medium">
+                                  {t.title}
+                                </span>
+                                <span className="text-xs text-muted-foreground line-clamp-2">
+                                  {t.content}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </div>
+                    );
+                  }
+                )}
+              </CommandList>
+              <div className="px-3 py-2 border-t text-[11px] text-muted-foreground flex items-center gap-2">
+                <span>Tip:</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">Alt</kbd>
+                <span>+</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">T</kbd>
+                <span>or</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">
+                  Ctrl
+                </kbd>
+                <span>+</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">/</kbd>
+                <span>to open quickly</span>
+              </div>
+            </CommandDialog>
+
+            <div className="flex gap-2 items-center">
               <Button
                 onClick={handleGenerate}
-                disabled={isGenerating || !brief.trim()}
+                disabled={isGenerating || !briefContent.trim()}
                 className="flex-1"
+                aria-label="Generate plan"
               >
                 {isGenerating ? (
                   <>
@@ -239,6 +415,22 @@ export default function AppDashboardPage() {
                   "Generate Plan"
                 )}
               </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setTemplateOpen(true)}
+                      aria-label="Open template picker"
+                      className="shrink-0"
+                    >
+                      <Sparkles size={16} className="mr-2" /> Use template
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Press Alt + T (or Ctrl + /)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
             {isGenerating && (
@@ -256,11 +448,21 @@ export default function AppDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {recentProjects.map((project) => (
               <Link key={project.id} href={`/space/board/${project.id}`}>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 border border-primary/20 bg-linear-to-br from-primary/10 to-secondary/10 hover:from-primary/20 hover:to-secondary/20 gradient-border">
                   <CardHeader>
-                    <CardTitle className="text-base">{project.title}</CardTitle>
-                    <CardDescription>
-                      {project.brief.substring(0, 100)}...
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <ProjectBadgeIcon title={project.title} />
+                        <span className="line-clamp-1 gradient-title">
+                          {project.title}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {formatRelativeTime(project.createdAt)}
+                      </span>
+                    </CardTitle>
+                    <CardDescription className="line-clamp-3">
+                      {project.brief}
                     </CardDescription>
                   </CardHeader>
                 </Card>

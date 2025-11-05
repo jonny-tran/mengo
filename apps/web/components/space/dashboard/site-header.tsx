@@ -22,7 +22,7 @@ export function SiteHeader() {
   const { items } = useBreadcrumb();
 
   return (
-    <header className="bg-background sticky top-0 z-50 flex w-full items-center border-b">
+    <header className="sticky top-0 z-50 flex w-full items-center border-b bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-(--header-height) w-full items-center gap-2 px-4">
         <Button
           className="h-8 w-8"

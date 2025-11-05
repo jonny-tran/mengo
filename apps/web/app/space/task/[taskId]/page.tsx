@@ -38,6 +38,7 @@ export default function TaskPage() {
   const [editContent, setEditContent] = useState("");
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notFound, setNotFound] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -45,8 +46,8 @@ export default function TaskPage() {
     // Load all data first
     const taskData = database.getTaskById(taskId);
     if (!taskData) {
+      setNotFound(true);
       toast.error("Task does not exist");
-      router.push("/space");
       return;
     }
 
@@ -176,7 +177,30 @@ export default function TaskPage() {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="mx-auto max-w-4xl">
-          <p>Loading...</p>
+          {!notFound ? (
+            <p>Loading...</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Task không tồn tại hoặc dữ liệu trống.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => router.back()}>Quay lại</Button>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await fetch("/api/debug/seed", { method: "POST" });
+                      toast.success("Đã seed demo dữ liệu. Đang tải lại...");
+                      location.reload();
+                    } catch (e) {
+                      toast.error("Seed dữ liệu thất bại");
+                    }
+                  }}
+                >
+                  Seed demo dữ liệu
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
