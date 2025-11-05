@@ -18,7 +18,7 @@ export default function AuthForm({ session }: AuthFormProps) {
         <p className="text-sm text-muted-foreground">
           Authentication is simulated in prototype mode.
         </p>
-        <Button onClick={() => router.push("/app/guest")}>
+        <Button onClick={() => router.push("/space/guest")}>
           Continue as Guest
         </Button>
       </div>
@@ -30,7 +30,7 @@ export default function AuthForm({ session }: AuthFormProps) {
       <p>
         Logged in as: <strong>Guest User</strong>
       </p>
-      <Button onClick={() => router.push("/app/guest")}>Sign Out</Button>
+      <Button onClick={() => router.push("/space/guest")}>Sign Out</Button>
     </div>
   );
 }

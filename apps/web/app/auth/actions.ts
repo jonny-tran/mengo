@@ -21,10 +21,10 @@ export async function verifyEmailOtp(email: string, token: string) {
   }
 
   // In prototype, redirect to guest page
-  redirect("/app/guest");
+  redirect("/space/guest");
 }
 
 export async function signOut() {
   // Simulated - not used in prototype
-  redirect("/app/guest");
+  redirect("/space/guest");
 }

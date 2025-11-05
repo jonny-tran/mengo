@@ -18,12 +18,14 @@ Tài liệu này mô tả chi tiết về cấu trúc code, chức năng và m�
 ## 🎯 Tổng quan kiến trúc
 
 Mengo được xây dựng theo mô hình **Simulation-First Prototype**, nghĩa là:
+
 - Tất cả external integrations (LLM, DB, Auth) được **simulate** (mô phỏng)
 - Data được lưu trong **localStorage** (in-memory với persistence)
 - Không cần API keys thật
 - Có thể demo đầy đủ mà không cần setup phức tạp
 
 ### Tech Stack
+
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + shadcn/ui
@@ -38,7 +40,7 @@ Mengo được xây dựng theo mô hình **Simulation-First Prototype**, nghĩa
 apps/web/
 ├── app/                    # Next.js App Router (Pages & Routes)
 │   ├── api/               # API endpoints (Server routes)
-│   ├── app/               # Student/User routes (nested trong /app)
+│   ├── space/               # Student/User routes (nested trong /space)
 │   ├── instructor/        # Instructor routes
 │   ├── import/            # CSV import page
 │   ├── debug/             # Admin/Debug page
@@ -63,6 +65,7 @@ apps/web/
 **Chức năng chính**:
 
 #### 1. **Type Definitions** (Dòng 1-78)
+
 ```typescript
 export type TaskStatus = 'todo' | 'progress' | 'done';
 export type HintLevel = 'metacognitive' | 'conceptual' | 'keywords';
@@ -76,54 +79,60 @@ export interface Comment { ... }
 export interface Team { ... }
 export interface AnalyticsEvent { ... }
 ```
+
 - Định nghĩa tất cả data models
 - TypeScript interfaces đảm bảo type safety
 
 #### 2. **Database Instance** (Dòng 80-292)
+
 ```typescript
 export const database = {
   // Users
   get users() { ... }
   setUser(user: User) { ... }
   getUserById(id: string) { ... }
-  
+
   // Projects
   setProject(project: Project) { ... }
   getProjectById(id: string) { ... }
-  
+
   // ... và nhiều methods khác
 }
 ```
 
 **Cách hoạt động**:
+
 - `dbInstance`: Biến private chứa toàn bộ data
 - `loadDatabase()`: Load từ localStorage khi khởi động
 - `saveDatabase()`: Lưu vào localStorage sau mỗi thay đổi
 - Mỗi method (`setUser`, `setProject`, ...) tự động save
 
 **Lưu ý quan trọng**:
+
 - Server-side: Trả về empty database (vì không có `window`)
 - Client-side: Load/save từ localStorage
 - Key trong localStorage: `'mengo_db'`
 
 **Ví dụ sử dụng**:
+
 ```typescript
 // Thêm user
 database.setUser({
-  id: 'user_1',
-  name: 'John',
-  email: 'john@example.com',
-  role: 'student'
+  id: "user_1",
+  name: "John",
+  email: "john@example.com",
+  role: "student",
 });
 
 // Lấy project
-const project = database.getProjectById('proj_1');
+const project = database.getProjectById("proj_1");
 
 // Lấy tất cả hints của task
-const hints = database.getHintsByTaskId('task_1');
+const hints = database.getHintsByTaskId("task_1");
 ```
 
 #### 3. **Helper Functions** (Dòng 297-320)
+
 - Wrapper functions để backward compatibility
 - Có thể deprecated trong tương lai
 
@@ -140,6 +149,7 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
 **Mục đích**: Mô phỏng LLM API để generate project plan từ brief.
 
 **Chức năng**:
+
 1. Nhận `brief` string từ request body
 2. Phân tích keywords trong brief
 3. Trả về plan với template tương ứng (e-commerce, task management, hoặc default)
@@ -148,6 +158,7 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
    - `?latency=800` - Simulate response time
 
 **Input**:
+
 ```typescript
 {
   brief: string;
@@ -158,6 +169,7 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
 ```
 
 **Output**:
+
 ```typescript
 {
   project_title: string;
@@ -167,7 +179,7 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
       title: string;
       description: string;
       hints: Array<{
-        level: 'metacognitive' | 'conceptual' | 'keywords';
+        level: "metacognitive" | "conceptual" | "keywords";
         content: string;
       }>;
     }>;
@@ -176,6 +188,7 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
 ```
 
 **Templates**:
+
 - **E-commerce**: Nếu brief chứa "e-commerce", "shop", "cart"
 - **Task Management**: Nếu brief chứa "task", "kanban", "board"
 - **Default**: Template generic cho các brief khác
@@ -187,12 +200,14 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
 ### `app/api/analytics/route.ts` - Event Tracking
 
 **Routes**:
+
 - `POST /api/analytics` - Record event
 - `GET /api/analytics?type=xxx` - Get events
 
 **Mục đích**: Track user actions để tính metrics (activation rate, time-to-first-task).
 
 **Event Types**:
+
 - `plan_created`
 - `task_created`
 - `hint_viewed`
@@ -200,20 +215,21 @@ Tất cả API routes nằm trong `app/api/`. Next.js App Router tự động t�
 - `task_assigned`
 
 **Cách sử dụng**:
+
 ```typescript
 // Record event
-await fetch('/api/analytics', {
-  method: 'POST',
+await fetch("/api/analytics", {
+  method: "POST",
   body: JSON.stringify({
-    type: 'task_completed',
-    projectId: 'proj_1',
-    taskId: 'task_1',
-    userId: 'user_1'
-  })
+    type: "task_completed",
+    projectId: "proj_1",
+    taskId: "task_1",
+    userId: "user_1",
+  }),
 });
 
 // Get events
-const res = await fetch('/api/analytics?type=plan_created');
+const res = await fetch("/api/analytics?type=plan_created");
 const { events } = await res.json();
 ```
 
@@ -226,6 +242,7 @@ const { events } = await res.json();
 **Mục đích**: Export analytics events để phân tích.
 
 **Formats**:
+
 - `json` (default)
 - `csv`
 
@@ -238,15 +255,18 @@ const { events } = await res.json();
 **Mục đích**: Import teams từ CSV file.
 
 **CSV Format**:
+
 ```csv
 team_name,member_emails,instructor_email
 Team Alpha,"alice@example.com;bob@example.com",inst1@example.com
 ```
 
 **Query Params**:
+
 - `?simulate_bad_csv=true` - Test error handling
 
 **Output**:
+
 ```typescript
 {
   success: true;
@@ -265,6 +285,7 @@ Team Alpha,"alice@example.com;bob@example.com",inst1@example.com
 **Mục đích**: Populate database với sample data để testing/demo.
 
 **Tạo**:
+
 - 3 instructors
 - 10 teams
 - 3 projects (với epics, tasks, hints)
@@ -272,6 +293,7 @@ Team Alpha,"alice@example.com;bob@example.com",inst1@example.com
 - Analytics events
 
 **Output**:
+
 ```typescript
 {
   success: true;
@@ -283,7 +305,7 @@ Team Alpha,"alice@example.com;bob@example.com",inst1@example.com
     tasks: number;
     hints: number;
     events: number;
-  };
+  }
 }
 ```
 
@@ -300,11 +322,13 @@ Team Alpha,"alice@example.com;bob@example.com",inst1@example.com
 **Mục đích**: Dashboard hiển thị tất cả projects của user.
 
 **Chức năng**:
+
 - Hiển thị grid các projects
 - Click vào project → navigate đến board
 - Button "Create New Project" → navigate đến `/app/guest`
 
 **Key Code**:
+
 ```typescript
 const projects = getProjectsForUser(MOCK_USER_ID);
 // Map projects thành cards
@@ -320,6 +344,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Landing page để user paste brief và generate plan.
 
 **Flow**:
+
 1. User nhập brief vào textarea
 2. Click "Generate Plan"
 3. Call `/api/llm/generate` với brief
@@ -328,15 +353,18 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 6. Redirect đến `/app/board/[projectId]`
 
 **Key Functions**:
+
 - `handleGenerate()`: Main logic để generate plan
 - `handlePreview()`: Preview brief (không generate)
 
 **State Management**:
+
 - `brief`: Brief text
 - `isGenerating`: Loading state
 - `showPreview`: Preview toggle
 
 **Lưu ý**:
+
 - Tự động tạo `guest_user` nếu chưa có
 - Mỗi task được tạo với 3 hints (metacognitive, conceptual, keywords)
 
@@ -349,6 +377,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Kanban board với 3 columns (To Do, In Progress, Done).
 
 **Chức năng**:
+
 1. **Load data**: Project, epics, tasks, users
 2. **Display columns**: 3 columns với tasks tương ứng
 3. **Drag & Drop**: HTML5 DnD API để move tasks
@@ -356,16 +385,19 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 5. **Task cards**: Click → navigate đến task detail
 
 **Key Functions**:
+
 - `handleStatusChange()`: Update task status
 - `handleAssign()`: Assign task to user
 - `handleDragStart/Drop()`: Drag & drop logic
 - `getTasksByStatus()`: Filter tasks by status
 
 **State**:
+
 - `project`, `epics`, `tasks`, `users`
 - `draggedTask`: Task đang được drag
 
 **UI Features**:
+
 - Epics badges ở trên
 - Task cards với hint preview
 - Assign dropdown
@@ -380,6 +412,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Chi tiết task với 3 editable hints và comments.
 
 **Chức năng**:
+
 1. **Display task info**: Title, description, status, assignee
 2. **3 editable hints**: Metacognitive, Conceptual, Keywords
 3. **Edit hints**: Click Edit → Textarea → Save/Cancel
@@ -387,18 +420,21 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 5. **Status/Assignee**: Change dropdown
 
 **Key Functions**:
+
 - `handleHintEdit/Save/Cancel()`: Hint editing logic
 - `handleStatusChange()`: Update status
 - `handleAssign()`: Update assignee
 - `handleAddComment()`: Add comment
 
 **State**:
+
 - `task`, `hints`, `comments`, `users`
 - `editingHint`: Hint ID đang edit
 - `editContent`: Content của hint đang edit
 - `newComment`: Comment text input
 
 **UI Sections**:
+
 1. Task header (title, status, assignee)
 2. Description
 3. 3-level hints (editable)
@@ -415,6 +451,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Dashboard cho instructor để monitor teams và stuck tasks.
 
 **Chức năng**:
+
 1. **Check admin mode**: localStorage `mengo_admin === 'true'`
 2. **Load teams**: Tất cả teams từ database
 3. **Calculate stuck tasks**: Tasks > X days với no comments
@@ -422,11 +459,13 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 5. **Export CSV**: Export stuck teams data
 
 **Key Functions**:
+
 - `loadData()`: Load teams và calculate stuck
 - `handleExportCSV()`: Export CSV file
 - Stuck calculation: `task_age_days > threshold && comment_count === 0 && status !== 'done'`
 
 **UI Sections**:
+
 1. Header với buttons (Import CSV, Export CSV)
 2. Stuck threshold input
 3. Stuck Teams Alert (card với danh sách)
@@ -443,6 +482,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Upload CSV file để import teams.
 
 **Chức năng**:
+
 1. **File upload**: HTML file input
 2. **Text paste**: Paste CSV content vào textarea
 3. **Parse CSV**: Parse và validate format
@@ -450,11 +490,13 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 5. **Show results**: Success/error messages
 
 **CSV Format**:
+
 - Header: `team_name,member_emails,instructor_email`
 - Member emails: Semicolon-separated
 - Example trong code có template
 
 **Key Functions**:
+
 - `handleFileUpload()`: Handle file input
 - `handleTextImport()`: Handle textarea paste
 - `handleDownloadTemplate()`: Download CSV template
@@ -470,6 +512,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 **Mục đích**: Admin page để view analytics và manage database.
 
 **Chức năng**:
+
 1. **Display metrics**: Activation rate, median time-to-first-task
 2. **Event statistics**: Counts by type
 3. **Recent events**: Last 50 events
@@ -477,16 +520,19 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 5. **Export events**: Download CSV
 
 **Key Functions**:
+
 - `loadData()`: Calculate stats từ events
 - `handleSeed()`: Call seed API
 - `handleReset()`: Reset database
 - `handleExportEvents()`: Export events CSV
 
 **Metrics Calculation**:
+
 - **Activation Rate**: `(plan_created_count / teams_count) * 100`
 - **Median Time**: Tính từ `plan_created` → `task_completed` events
 
 **Acceptance Criteria**:
+
 - Activation ≥70% (badge green/red)
 - Median time ≤24h (badge green/red)
 
@@ -499,6 +545,7 @@ const projects = getProjectsForUser(MOCK_USER_ID);
 Tất cả components từ shadcn/ui library. Đã được cấu hình sẵn với Tailwind.
 
 **Common components**:
+
 - `Button`, `Card`, `Input`, `Textarea`
 - `Select`, `Badge`, `Skeleton`
 - `Dialog`, `Toast` (Sonner)
@@ -580,6 +627,7 @@ Load events → Calculate metrics
 ### 1. **Simulation-First Pattern**
 
 Tất cả external services được simulate:
+
 - LLM → Template-based responses
 - Database → localStorage
 - Auth → localStorage flag
@@ -601,6 +649,7 @@ Tất cả external services được simulate:
 ### 3. **Type Safety**
 
 Tất cả data models có TypeScript interfaces:
+
 - Compile-time error checking
 - IntelliSense support
 - Documented structure
@@ -610,6 +659,7 @@ Tất cả data models có TypeScript interfaces:
 ### 4. **Event-Driven Analytics**
 
 Mọi user action được track qua events:
+
 - Centralized tracking
 - Dễ tính metrics
 - Có thể export để phân tích
@@ -671,16 +721,19 @@ Khi muốn connect real services:
 ## 📝 Notes
 
 ### Performance
+
 - localStorage có giới hạn (~5-10MB)
 - Nhiều data có thể làm chậm
 - Consider pagination cho large lists
 
 ### Security
+
 - Hiện tại không có real security
 - localStorage có thể bị modify
 - Cần validation khi connect real services
 
 ### Testing
+
 - Seed data để test: `/debug` → "Seed Database"
 - Reset data: `/debug` → "Reset Database"
 - Test flows trong README.md
@@ -697,4 +750,3 @@ Khi muốn connect real services:
 ---
 
 **Tài liệu này sẽ được cập nhật khi có thay đổi trong codebase.**
-

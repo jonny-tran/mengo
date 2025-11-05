@@ -35,7 +35,7 @@ export default function InstructorDashboard() {
         const isAdmin = localStorage.getItem('mengo_admin') === 'true';
         if (!isAdmin) {
             toast.error('Instructor access required');
-            router.push('/app/guest');
+            router.push('/space/guest');
             return;
         }
 
@@ -210,7 +210,7 @@ export default function InstructorDashboard() {
                                                     >
                                                         <div className="flex-1">
                                                             <Link
-                                                                href={`/app/task/${task.id}`}
+                                                                href={`/space/task/${task.id}`}
                                                                 className="font-medium hover:underline"
                                                             >
                                                                 {task.title}
