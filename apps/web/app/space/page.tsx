@@ -11,13 +11,37 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Epic, Hint, Project, Task } from "@/lib/mock-data";
 import { database } from "@/lib/mock-data";
+import { ALL_PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ShoppingCart, BookOpen, PenSquare, Sparkles } from "lucide-react";
+import {
+  ShoppingCart,
+  BookOpen,
+  PenSquare,
+  Sparkles,
+  Blocks,
+  Layout,
+  NotebookPen,
+} from "lucide-react";
 
 interface HintData {
   level?: "metacognitive" | "conceptual" | "keywords";
@@ -42,16 +66,11 @@ interface PlanResponse {
 
 export default function AppDashboardPage() {
   const router = useRouter();
-  const [brief, setBrief] = useState("");
+  const [briefContent, setBriefContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   // No hard limit for brief length
-
-  const sampleBriefs = [
-    "Build a mini e-commerce for mugs with cart and checkout",
-    "Create a study planner with tasks, hints and progress tracking",
-    "Simple blog with editor, tags, and public sharing",
-  ];
 
   const handleTextareaKeyDown = (
     e: React.KeyboardEvent<HTMLTextAreaElement>
@@ -60,11 +79,45 @@ export default function AppDashboardPage() {
       (e.ctrlKey || e.metaKey) &&
       e.key === "Enter" &&
       !isGenerating &&
-      brief.trim()
+      briefContent.trim()
     ) {
       e.preventDefault();
       void handleGenerate();
     }
+  };
+
+  // Hotkey: Alt + T (and fallback Ctrl + /) to open template palette
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isAltT =
+        e.altKey && (e.key.toLowerCase() === "t" || e.code === "KeyT");
+      const isCtrlSlash = e.ctrlKey && (e.key === "/" || e.code === "Slash");
+      if (isAltT || isCtrlSlash) {
+        e.preventDefault();
+        setTemplateOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Group templates by category for palette
+  const templatesByCategory = useMemo(() => {
+    const map = new Map<string, typeof ALL_PROMPT_TEMPLATES>();
+    ALL_PROMPT_TEMPLATES.forEach((t) => {
+      const list = map.get(t.category) ?? [];
+      list.push(t);
+      map.set(t.category, list);
+    });
+    return map;
+  }, []);
+
+  const categoryIcon = (cat: string) => {
+    const lower = cat.toLowerCase();
+    if (lower.includes("mini-app")) return Blocks;
+    if (lower.includes("frontend")) return Layout;
+    if (lower.includes("fullstack")) return NotebookPen;
+    return Sparkles;
   };
 
   const formatRelativeTime = (iso: string) => {
@@ -120,7 +173,7 @@ export default function AppDashboardPage() {
   ];
 
   const handleGenerate = async () => {
-    if (!brief.trim()) {
+    if (!briefContent.trim()) {
       toast.error("Please enter a project brief");
       return;
     }
@@ -134,7 +187,7 @@ export default function AppDashboardPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          brief: brief.trim(),
+          brief: briefContent.trim(),
           template: "default",
           simulate_success: true,
         }),
@@ -161,7 +214,7 @@ export default function AppDashboardPage() {
       const project: Project = {
         id: projectId,
         title: plan.project_title,
-        brief: brief.trim(),
+        brief: briefContent.trim(),
         ownerId: guestUserId,
         createdAt: new Date().toISOString(),
       };
@@ -272,8 +325,8 @@ export default function AppDashboardPage() {
           <CardContent className="space-y-4">
             <Textarea
               placeholder="Example: Build a mini e-commerce platform to sell mugs with cart and checkout..."
-              value={brief}
-              onChange={(e) => setBrief(e.target.value)}
+              value={briefContent}
+              onChange={(e) => setBriefContent(e.target.value)}
               onKeyDown={handleTextareaKeyDown}
               className="min-h-32 focus-visible:ring-2 focus-visible:ring-primary/40"
               disabled={isGenerating}
@@ -283,10 +336,73 @@ export default function AppDashboardPage() {
               <span>Tip: Press Ctrl/⌘ + Enter to generate</span>
             </div>
 
-            <div className="flex gap-2">
+            {/* Command Palette */}
+            <CommandDialog open={templateOpen} onOpenChange={setTemplateOpen}>
+              <div className="px-3 pt-3 pb-2">
+                <div className="text-base font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Choose a
+                  template
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Search by name or browse categories. Press Enter to insert.
+                </p>
+              </div>
+              <CommandInput placeholder="Search templates..." />
+              <CommandList>
+                <CommandEmpty>No templates found.</CommandEmpty>
+                {Array.from(templatesByCategory.entries()).map(
+                  ([cat, items], idx) => {
+                    const Icon = categoryIcon(cat);
+                    return (
+                      <div key={cat}>
+                        {idx > 0 && <CommandSeparator />}
+                        <CommandGroup heading={cat}>
+                          {items.map((t) => (
+                            <CommandItem
+                              key={t.title}
+                              value={`${cat} ${t.title}`}
+                              onSelect={() => {
+                                setBriefContent(t.prompt);
+                                setTemplateOpen(false);
+                              }}
+                              className="items-start gap-3"
+                            >
+                              <Icon className="mt-0.5 h-4 w-4 text-primary" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-medium">
+                                  {t.title}
+                                </span>
+                                <span className="text-xs text-muted-foreground line-clamp-2">
+                                  {t.content}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </div>
+                    );
+                  }
+                )}
+              </CommandList>
+              <div className="px-3 py-2 border-t text-[11px] text-muted-foreground flex items-center gap-2">
+                <span>Tip:</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">Alt</kbd>
+                <span>+</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">T</kbd>
+                <span>or</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">
+                  Ctrl
+                </kbd>
+                <span>+</span>
+                <kbd className="rounded border bg-muted px-1.5 py-0.5">/</kbd>
+                <span>to open quickly</span>
+              </div>
+            </CommandDialog>
+
+            <div className="flex gap-2 items-center">
               <Button
                 onClick={handleGenerate}
-                disabled={isGenerating || !brief.trim()}
+                disabled={isGenerating || !briefContent.trim()}
                 className="flex-1"
                 aria-label="Generate plan"
               >
@@ -299,6 +415,22 @@ export default function AppDashboardPage() {
                   "Generate Plan"
                 )}
               </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setTemplateOpen(true)}
+                      aria-label="Open template picker"
+                      className="shrink-0"
+                    >
+                      <Sparkles size={16} className="mr-2" /> Use template
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Press Alt + T (or Ctrl + /)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
             {isGenerating && (
@@ -310,22 +442,6 @@ export default function AppDashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        <div className="mt-4">
-          <div className="flex flex-wrap gap-2">
-            {sampleBriefs.map((s, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setBrief(s)}
-                className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-                aria-label={`Use sample brief ${i + 1}`}
-              >
-                Try: {s.length > 60 ? `${s.slice(0, 60)}…` : s}
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Your recent projects</h2>
