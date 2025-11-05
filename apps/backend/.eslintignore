@@ -1,0 +1,8 @@
+# .eslintignore
+
+# Bỏ qua các file do Prisma tạo ra
+/node_modules
+/dist
+
+# Bỏ qua kịch bản seed (không phải mã nguồn ứng dụng)
+prisma/seed.ts
