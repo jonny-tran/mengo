@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { SidebarIcon } from "lucide-react";
 
 import { SearchForm } from "@/components/space/dashboard/search-form";
@@ -38,8 +39,8 @@ export function SiteHeader() {
               {items.map((item, idx) => {
                 const isLast = idx === items.length - 1;
                 return (
-                  <>
-                    <BreadcrumbItem key={`bc-item-${idx}`}>
+                  <React.Fragment key={`bc-frag-${idx}`}>
+                    <BreadcrumbItem>
                       {isLast ? (
                         <BreadcrumbPage>{item.label}</BreadcrumbPage>
                       ) : (
@@ -48,8 +49,8 @@ export function SiteHeader() {
                         </BreadcrumbLink>
                       )}
                     </BreadcrumbItem>
-                    {!isLast && <BreadcrumbSeparator key={`bc-sep-${idx}`} />}
-                  </>
+                    {!isLast && <BreadcrumbSeparator />}
+                  </React.Fragment>
                 );
               })}
             </BreadcrumbList>
