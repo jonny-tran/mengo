@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { BreadcrumbSetter } from "@/components/space/dashboard/breadcrumb-context";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -12,11 +10,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import type { Epic, Hint, Project, Task } from "@/lib/mock-data";
 import { database } from "@/lib/mock-data";
-import type { Project, Epic, Task, Hint } from "@/lib/mock-data";
 import Link from "next/link";
-import { BreadcrumbSetter } from "@/components/space/dashboard/breadcrumb-context";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { ShoppingCart, BookOpen, PenSquare, Sparkles } from "lucide-react";
 
 interface HintData {
   level?: "metacognitive" | "conceptual" | "keywords";
@@ -43,6 +44,56 @@ export default function AppDashboardPage() {
   const router = useRouter();
   const [brief, setBrief] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // No hard limit for brief length
+
+  const sampleBriefs = [
+    "Build a mini e-commerce for mugs with cart and checkout",
+    "Create a study planner with tasks, hints and progress tracking",
+    "Simple blog with editor, tags, and public sharing",
+  ];
+
+  const handleTextareaKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      e.key === "Enter" &&
+      !isGenerating &&
+      brief.trim()
+    ) {
+      e.preventDefault();
+      void handleGenerate();
+    }
+  };
+
+  const formatRelativeTime = (iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const sec = Math.floor(diffMs / 1000);
+    const min = Math.floor(sec / 60);
+    const hr = Math.floor(min / 60);
+    const day = Math.floor(hr / 24);
+    if (day > 0) return `${day}d ago`;
+    if (hr > 0) return `${hr}h ago`;
+    if (min > 0) return `${min}m ago`;
+    return "just now";
+  };
+
+  const ProjectBadgeIcon = ({ title }: { title: string }) => {
+    const lower = title.toLowerCase();
+    const Icon = /e-?commerce|shop|mug/.test(lower)
+      ? ShoppingCart
+      : /study|planner|learn/.test(lower)
+        ? BookOpen
+        : /blog|write|editor/.test(lower)
+          ? PenSquare
+          : Sparkles;
+    return (
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <Icon size={12} />
+      </span>
+    );
+  };
 
   // Mock lịch sử projects của người dùng (tạm thời hard-code tại đây)
   const recentProjects: Array<
@@ -196,18 +247,21 @@ export default function AppDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="min-h-screen bg-background page-gradient-bg p-4 md:p-8">
       <div className="mx-auto max-w-4xl">
         <BreadcrumbSetter items={[{ label: "Workspace", href: "/space" }]} />
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">Mengo</h1>
-          <p className="text-muted-foreground">
-            Transform project briefs into plans with AI-generated epics, tasks
-            and hints
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 gradient-title tracking-tight leading-[1.2] md:leading-[1.15] pb-1 md:pb-1.5">
+            Task by Task
+          </h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Turn vague ideas into clear, actionable plans with organized epics,
+            detailed tasks, and helpful hints.
           </p>
         </div>
 
-        <Card>
+        {/* Premium Card with mesh gradient, soft shadow, and border */}
+        <Card className="mesh-gradient-bg shadow-2xl border border-primary/20 rounded-2xl transition-all duration-200">
           <CardHeader>
             <CardTitle>Paste Project Brief</CardTitle>
             <CardDescription>
@@ -220,15 +274,21 @@ export default function AppDashboardPage() {
               placeholder="Example: Build a mini e-commerce platform to sell mugs with cart and checkout..."
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
-              className="min-h-32"
+              onKeyDown={handleTextareaKeyDown}
+              className="min-h-32 focus-visible:ring-2 focus-visible:ring-primary/40"
               disabled={isGenerating}
+              aria-label="Project brief input"
             />
+            <div className="flex items-center justify-start text-xs text-muted-foreground">
+              <span>Tip: Press Ctrl/⌘ + Enter to generate</span>
+            </div>
 
             <div className="flex gap-2">
               <Button
                 onClick={handleGenerate}
                 disabled={isGenerating || !brief.trim()}
                 className="flex-1"
+                aria-label="Generate plan"
               >
                 {isGenerating ? (
                   <>
@@ -251,16 +311,42 @@ export default function AppDashboardPage() {
           </CardContent>
         </Card>
 
+        <div className="mt-4">
+          <div className="flex flex-wrap gap-2">
+            {sampleBriefs.map((s, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setBrief(s)}
+                className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                aria-label={`Use sample brief ${i + 1}`}
+              >
+                Try: {s.length > 60 ? `${s.slice(0, 60)}…` : s}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Your recent projects</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {recentProjects.map((project) => (
               <Link key={project.id} href={`/space/board/${project.id}`}>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 border border-primary/20 bg-linear-to-br from-primary/10 to-secondary/10 hover:from-primary/20 hover:to-secondary/20 gradient-border">
                   <CardHeader>
-                    <CardTitle className="text-base">{project.title}</CardTitle>
-                    <CardDescription>
-                      {project.brief.substring(0, 100)}...
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <ProjectBadgeIcon title={project.title} />
+                        <span className="line-clamp-1 gradient-title">
+                          {project.title}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {formatRelativeTime(project.createdAt)}
+                      </span>
+                    </CardTitle>
+                    <CardDescription className="line-clamp-3">
+                      {project.brief}
                     </CardDescription>
                   </CardHeader>
                 </Card>

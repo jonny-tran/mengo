@@ -30,6 +30,7 @@ export default function BoardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -37,8 +38,8 @@ export default function BoardPage() {
     // Load project
     const proj = database.getProjectById(projectId);
     if (!proj) {
+      setNotFound(true);
       toast.error("Project does not exist");
-      router.push("/space");
       return;
     }
     // Prepare all data first
@@ -145,7 +146,29 @@ export default function BoardPage() {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="mx-auto max-w-7xl">
-          <p>Loading...</p>
+          {!notFound ? (
+            <p>Loading...</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Project không tồn tại hoặc dữ liệu trống.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => router.back()}>Quay lại</Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await fetch("/api/debug/seed", { method: "POST" });
+                      toast.success("Đã seed demo dữ liệu. Đang tải lại...");
+                      location.reload();
+                    } catch (e) {
+                      toast.error("Seed dữ liệu thất bại");
+                    }
+                  }}
+                >
+                  Seed demo dữ liệu
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
