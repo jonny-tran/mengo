@@ -1,30 +1,86 @@
 "use server";
 
-// Simulated auth actions - not used in prototype
-// All auth is simulated via localStorage in prototype mode
 import { redirect } from "next/navigation";
 
-export async function requestEmailOtp(email: string) {
-  // Simulated - not used in prototype
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: "Email không hợp lệ." } as const;
+import { ApiError, requestOtp, verifyOtp } from "@mengo/api-client/services";
+import { clearAuthCookies, performLogout, setAuthCookies } from "@/lib/auth/session";
+
+export type RequestEmailOtpState = {
+  success: boolean;
+  error?: string;
+  email?: string;
+};
+
+export type VerifyEmailOtpState = {
+  success: boolean;
+  error?: string;
+};
+
+export async function requestEmailOtp(
+  _prevState: RequestEmailOtpState,
+  formData: FormData,
+): Promise<RequestEmailOtpState> {
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
+
+  if (!email) {
+    return { success: false, error: "Please enter a valid email." };
   }
 
-  // In prototype, always return success
-  return { success: true } as const;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email format." };
+  }
+
+  try {
+    await requestOtp(email);
+    return { success: true, email };
+  } catch (error: unknown) {
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : "Unable to send OTP code. Please try again.";
+    return { success: false, error: message, email };
+  }
 }
 
-export async function verifyEmailOtp(email: string, token: string) {
-  // Simulated - not used in prototype
-  if (!email || !token) {
-    return { error: "Thiếu email hoặc mã OTP." } as const;
+export async function verifyEmailOtp(
+  _prevState: VerifyEmailOtpState,
+  formData: FormData,
+): Promise<VerifyEmailOtpState> {
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
+  const otp = String(formData.get("otp") ?? "").trim();
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email." };
   }
 
-  // In prototype, redirect to guest page
-  redirect("/space/guest");
+  if (!/^\d{6}$/.test(otp)) {
+    return { success: false, error: "OTP code must be 6 digits." };
+  }
+
+  try {
+    const payload = await verifyOtp(email, otp);
+
+    if (payload.user.role !== "STUDENT") {
+      await clearAuthCookies();
+      return {
+        success: false,
+        error: "Your account has not been granted access to the student area.",
+      };
+    }
+
+    await setAuthCookies(payload);
+    return { success: true };
+  } catch (error: unknown) {
+    await clearAuthCookies();
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : "Invalid OTP code or has expired.";
+    return { success: false, error: message };
+  }
 }
 
 export async function signOut() {
-  // Simulated - not used in prototype
-  redirect("/space/guest");
+  await performLogout();
+  redirect("/");
 }

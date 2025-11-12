@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 
+import type { AuthInfoResponse } from "@mengo/api-client/types";
+
 const personalNav: { title: string; url: string; icon: LucideIcon }[] = [
   { title: "My Tasks", url: "/space/my-tasks", icon: ListTodo },
   { title: "Starred", url: "/space/starred", icon: Star },
@@ -43,18 +45,16 @@ const studentNav: { title: string; url: string; icon: LucideIcon }[] = [
 ];
 
 const data = {
-  user: {
-    name: "Guest User",
-    email: "guest@example.com",
-    avatar: "https://github.com/shadcn.png",
-  },
   navSupport: [
     { title: "Help", url: "/help", icon: LifeBuoy },
     { title: "Feedback", url: "/feedback", icon: Send },
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: AuthInfoResponse }) {
   return (
     <Sidebar
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]! bg-linear-to-b from-primary/15 via-accent/12 to-secondary/15 backdrop-blur-sm border-r"
@@ -103,7 +103,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         {/* Group 5: Account (Bottom-Most) */}
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: user.name ?? user.email,
+            email: user.email,
+            avatar: user.avatar ?? undefined,
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
   );
