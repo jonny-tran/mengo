@@ -6,3 +6,4 @@
 
 # Bỏ qua kịch bản seed (không phải mã nguồn ứng dụng)
 prisma/seed.ts
+tsconfig.json

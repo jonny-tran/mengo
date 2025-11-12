@@ -13,13 +13,18 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@mengo/database": ["../../packages/database"],
+      "@mengo/database/*": ["../../packages/database/*"],
+      "@mengo/api-client": ["../../packages/api-client/src"],
+      "@mengo/api-client/*": ["../../packages/api-client/src/*"]
     }
   },
   "include": [
