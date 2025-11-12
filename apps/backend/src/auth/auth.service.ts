@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -6,11 +6,12 @@ import * as bcrypt from 'bcrypt';
 import { sign } from 'jsonwebtoken';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - @mengo/database types will be available after Prisma client generation
-import { PrismaClient, Role } from '@mengo/database';
+import { PrismaClient, Role, User } from '@mengo/database';
 
 @Injectable()
 export class AuthService {
   private prisma: PrismaClient;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     prismaService: PrismaService,
@@ -115,22 +116,12 @@ export class AuthService {
 
     // Generate tokens
     const tokens = this.generateTokens(user.id, role);
-    const hashedRt = await this.hashData(tokens.refreshToken);
 
-    // Update user with refresh token
-    await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: { hashedRefreshToken: hashedRt },
-    });
-
-    // Delete used OTP
-    await this.prisma.authOtp.delete({
-      where: {
-        id: latestOtp.id,
-      },
-    });
+    // 4. (Song song) Xóa OTP đã dùng VÀ Tạo tokens
+    await Promise.all([
+      this.updateHashedRefreshToken(user.id, tokens.refreshToken),
+      this.prisma.authOtp.delete({ where: { id: latestOtp.id } }),
+    ]);
 
     return {
       accessToken: tokens.accessToken,
@@ -248,5 +239,64 @@ export class AuthService {
       avatar: null, // Avatar field doesn't exist in schema yet, return null for now
       role: role as string,
     };
+  }
+
+  // ==========================================
+  // GOOGLE OAUTH LOGIC
+  // ==========================================
+
+  /**
+   * Finds an existing user by Google email or creates a new one.
+   * Called by GoogleStrategy.validate()
+   */
+  async validateGoogleUser(profile: {
+    emails?: Array<{ value?: string }>;
+    displayName?: string;
+    photos?: Array<{ value?: string }>;
+  }): Promise<User> {
+    const email = profile.emails?.[0]?.value;
+    if (!email || typeof email !== 'string') {
+      this.logger.error('Google profile missing email', profile);
+      throw new UnauthorizedException('Google login failed: No email provided');
+    }
+
+    // 1. Find user by email
+    let user = (await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        memberships: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    })) as User | null;
+
+    // 2. If user does not exist, create them
+    if (!user) {
+      this.logger.log(`Creating new user from Google Profile: ${email}`);
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: profile.displayName || null,
+          // If you add `avatarUrl` to your schema.prisma, uncomment this:
+          // avatarUrl: profile.photos?.[0]?.value,
+        },
+      });
+    }
+
+    // 3. Return the Prisma user model
+    return user;
+  }
+
+  /**
+   * Helper function to hash and save refresh token
+   * This should be reused by all auth flows (OTP, Google, etc.)
+   */
+  async updateHashedRefreshToken(userId: string, refreshToken: string) {
+    const hashedRt = await this.hashData(refreshToken);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken: hashedRt },
+    });
   }
 }

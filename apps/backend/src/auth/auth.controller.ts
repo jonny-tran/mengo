@@ -6,7 +6,12 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Req,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiTags,
   ApiOperation,
@@ -20,6 +25,9 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { JwtPayload } from './strategies/jwt.strategy';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - @mengo/database types will be available after Prisma client generation
+import type { User, Role } from '@mengo/database';
 import {
   RequestOtpDto,
   VerifyOtpDto,
@@ -32,7 +40,10 @@ import {
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   @Post('request-otp')
   @HttpCode(HttpStatus.OK)
@@ -186,5 +197,62 @@ export class AuthController {
   })
   async getUserInfo(@CurrentUser() user: JwtPayload) {
     return this.authService.getUserInfo(user.sub);
+  }
+
+  // ==========================================
+  // GOOGLE OAUTH ENDPOINTS (New)
+  // ==========================================
+
+  /**
+   * Endpoint 1: GET /auth/google
+   * This is the route the frontend will link to,
+   * to start the Google login flow.
+   */
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+    // This function will not execute.
+    // The 'google' AuthGuard redirects the user to Google's consent screen.
+  }
+
+  /**
+   * Endpoint 2: GET /auth/google/callback
+   * This is the route Google redirects back to after consent.
+   * The 'google' AuthGuard activates, runs GoogleStrategy.validate(),
+   * and attaches the user to req.user.
+   */
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthCallback(
+    @Req() req: { user: User & { memberships?: Array<{ role: Role }> } },
+    @Res() res: Response,
+  ) {
+    // req.user is populated by the GoogleStrategy.validate() function
+    const user = req.user;
+
+    // 1. Get user role from membership or default to STUDENT
+    const role =
+      user.memberships && user.memberships.length > 0
+        ? user.memberships[0].role
+        : ('STUDENT' as Role);
+
+    // 2. Generate our application's JWT tokens
+    const tokens = this.authService.generateTokens(user.id, role);
+
+    // 3. Save the hashed refresh token to the DB
+    await this.authService.updateHashedRefreshToken(
+      user.id,
+      tokens.refreshToken,
+    );
+
+    // 4. Redirect the user back to the frontend application,
+    // passing the tokens in the URL query parameters.
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    if (!frontendUrl) {
+      throw new Error('FRONTEND_URL is not defined in environment variables');
+    }
+    res.redirect(
+      `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
+    );
   }
 }

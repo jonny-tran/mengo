@@ -8,13 +8,15 @@ import { MailModule } from '../mail/mail.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { GoogleStrategy } from './google.strategy';
 
 @Module({
   imports: [
     ConfigModule,
     MailModule,
     PrismaModule,
-    PassportModule,
+    // Register Passport, setting the default strategy (e.g., 'jwt' if you have it)
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -26,7 +28,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, GoogleStrategy],
   controllers: [AuthController],
   exports: [AuthService, JwtAuthGuard],
 })
