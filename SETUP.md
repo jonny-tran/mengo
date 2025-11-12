@@ -313,6 +313,7 @@ pnpm build
 
 - **Backend API Documentation:** See `apps/backend/docs/AUTH_API.md`
 - **Frontend Architecture:** See `apps/web/ARCHITECTURE.md`
+- **Auth Integration Guide:** See `apps/web/docs/AUTH_INTEGRATION.md`
 - **Project Overview:** See `README.md`
 
 ## ✅ Next Steps
