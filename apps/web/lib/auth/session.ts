@@ -77,7 +77,7 @@ export async function requireStudentUser(): Promise<AuthInfoResponse> {
   if (!user) {
     // Redirect to clear route handler which will clear cookies and redirect to login
     redirect("/api/auth/clear?redirect=/auth/login");
-  }
+  } 
 
   if (user.role !== "STUDENT") {
     // Redirect to clear route handler which will clear cookies and redirect to login with error
