@@ -176,11 +176,33 @@ export default function AppDashboardPage() {
         {/* Premium Card with mesh gradient, soft shadow, and border */}
         <Card className="mesh-gradient-bg shadow-2xl border border-primary/20 rounded-2xl transition-all duration-200">
           <CardHeader>
-            <CardTitle>Paste Project Brief</CardTitle>
-            <CardDescription>
-              Enter your project brief and let Mengo create a plan with epics,
-              tasks and 3-level hints
-            </CardDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <CardTitle>Paste Project Brief</CardTitle>
+                <CardDescription>
+                  Enter your project brief and let Mengo create a plan with epics,
+                  tasks and 3-level hints
+                </CardDescription>
+              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTemplateOpen(true)}
+                      disabled={showGenerating}
+                      aria-label="Open template picker"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Sparkles size={14} className="mr-1.5" /> Use template
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Press Alt + T (or Ctrl + /)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Command Palette */}
@@ -260,33 +282,14 @@ export default function AppDashboardPage() {
                 <span>Tip: Press Ctrl/⌘ + Enter to generate</span>
               </div>
 
-              <div className="flex gap-2 items-center">
-                <Button
-                  type="submit"
-                  disabled={showGenerating || !briefContent.trim()}
-                  className="flex-1"
-                  aria-label="Generate plan"
-                >
-                  Generate plan
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setTemplateOpen(true)}
-                        disabled={showGenerating}
-                        aria-label="Open template picker"
-                        className="shrink-0"
-                      >
-                        <Sparkles size={16} className="mr-2" /> Use template
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Press Alt + T (or Ctrl + /)</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+              <Button
+                type="submit"
+                disabled={showGenerating || !briefContent.trim()}
+                className="w-full"
+                aria-label="Generate plan"
+              >
+                Generate plan
+              </Button>
             </form>
           </CardContent>
         </Card>

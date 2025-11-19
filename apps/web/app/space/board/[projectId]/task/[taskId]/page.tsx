@@ -24,9 +24,6 @@ import {
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  Edit2,
-  Save,
-  X,
   CheckCircle2,
   Circle,
   Clock,
@@ -39,17 +36,12 @@ import {
   Hash,
   Loader2,
   AlertCircle,
+  Copy,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
@@ -57,6 +49,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { BreadcrumbSetter } from "@/components/space/dashboard/breadcrumb-context";
 
 export default function TaskPage() {
   const router = useRouter();
@@ -67,13 +60,11 @@ export default function TaskPage() {
   const [hints, setHints] = useState<Hint[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [editContent, setEditContent] = useState("");
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notFound, setNotFound] = useState<boolean>(false);
   const [originalBrief, setOriginalBrief] = useState<string>("");
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingHintId, setEditingHintId] = useState<string | null>(null);
+  const [copiedHintId, setCopiedHintId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -126,29 +117,17 @@ export default function TaskPage() {
     }, 0);
   }, [taskId, router]);
 
-  const handleHintEdit = (hintId: string) => {
-    const hint = hints.find((h) => h.id === hintId);
-    if (hint) {
-      setEditingHintId(hintId);
-      setEditContent(hint.content);
-      setIsEditDialogOpen(true);
+  const handleCopyHint = async (hintContent: string, hintId: string) => {
+    try {
+      await navigator.clipboard.writeText(hintContent);
+      setCopiedHintId(hintId);
+      toast.success("Hint copied to clipboard!");
+      setTimeout(() => {
+        setCopiedHintId(null);
+      }, 2000);
+    } catch (error) {
+      toast.error("Failed to copy hint");
     }
-  };
-
-  const handleHintSave = (hintId: string) => {
-    database.updateHint(hintId, { content: editContent });
-    const updatedHints = database.getHintsByTaskId(taskId);
-    setHints(updatedHints);
-    setEditingHintId(null);
-    setEditContent("");
-    setIsEditDialogOpen(false);
-    toast.success("Hint has been updated");
-  };
-
-  const handleHintCancel = () => {
-    setEditingHintId(null);
-    setEditContent("");
-    setIsEditDialogOpen(false);
   };
 
   const handleStatusChange = (newStatus: "todo" | "progress" | "done") => {
@@ -330,6 +309,13 @@ export default function TaskPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
+        <BreadcrumbSetter
+          items={[
+            { label: "Workspace", href: "/space" },
+            { label: "Board", href: `/space/board/${task?.projectId || ""}` },
+            { label: task?.title || "Task", href: `/space/board/${task?.projectId || ""}/task/${taskId}` },
+          ]}
+        />
         {/* Header with Back Button */}
         <div className="mb-6 flex items-center gap-4">
           <Link href={`/space/board/${task.projectId}`}>
@@ -618,7 +604,7 @@ export default function TaskPage() {
                     </div>
                     <div>
                       <CardTitle className="text-lg">
-                        Hints (Editable)
+                        Hints
                       </CardTitle>
                       <CardDescription className="mt-1">
                         3-level hint system
@@ -654,74 +640,25 @@ export default function TaskPage() {
                             </div>
                           </AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-3 pt-2">
-                              <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-9">
-                                {hint.content}
-                              </p>
-                              <Dialog
-                                open={
-                                  isEditDialogOpen && editingHintId === hint.id
-                                }
-                                onOpenChange={(open) => {
-                                  if (!open) {
-                                    handleHintCancel();
-                                  } else {
-                                    setIsEditDialogOpen(true);
-                                  }
-                                }}
-                              >
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleHintEdit(hint.id)}
-                                    className="gap-1.5 w-full"
-                                  >
-                                    <Edit2 className="h-3.5 w-3.5" />
-                                    Edit
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-2xl">
-                                  <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                      <Lightbulb className="h-5 w-5 text-primary" />
-                                      Edit{" "}
-                                      {hintLevelLabels[hint.level] ||
-                                        hint.level}{" "}
-                                      Hint
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <div className="space-y-4 py-4">
-                                    <Textarea
-                                      value={editContent}
-                                      onChange={(e) =>
-                                        setEditContent(e.target.value)
-                                      }
-                                      className="min-h-32 text-sm"
-                                      placeholder="Enter hint content..."
-                                    />
-                                    <div className="flex gap-2 justify-end">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleHintCancel}
-                                        className="gap-1.5"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleHintSave(hint.id)}
-                                        className="gap-1.5"
-                                      >
-                                        <Save className="h-3.5 w-3.5" />
-                                        Save
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
+                            <div className="pt-2 space-y-3">
+                              <div className="flex items-start justify-between gap-3 pl-9">
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap flex-1">
+                                  {hint.content}
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyHint(hint.content, hint.id)}
+                                  className="h-8 w-8 shrink-0 opacity-70 hover:opacity-100 transition-opacity"
+                                  title="Copy hint"
+                                >
+                                  {copiedHintId === hint.id ? (
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
                             </div>
                           </AccordionContent>
                         </AccordionItem>

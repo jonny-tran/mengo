@@ -66,7 +66,8 @@ export async function fetchCurrentUser(): Promise<AuthInfoResponse | null> {
     const user = await getUserInfo(accessToken);
     return user;
   } catch {
-    await clearAuthCookies();
+    // Don't clear cookies here - cookies can only be modified in Server Actions or Route Handlers
+    // Return null and let the caller handle redirect/clear via route handler
     return null;
   }
 }
@@ -74,12 +75,13 @@ export async function fetchCurrentUser(): Promise<AuthInfoResponse | null> {
 export async function requireStudentUser(): Promise<AuthInfoResponse> {
   const user = await fetchCurrentUser();
   if (!user) {
-    redirect("/auth/login");
+    // Redirect to clear route handler which will clear cookies and redirect to login
+    redirect("/api/auth/clear?redirect=/auth/login");
   }
 
   if (user.role !== "STUDENT") {
-    await performLogout();
-    redirect("/auth/login?error=forbidden");
+    // Redirect to clear route handler which will clear cookies and redirect to login with error
+    redirect("/api/auth/clear?redirect=/auth/login?error=forbidden");
   }
 
   return user;

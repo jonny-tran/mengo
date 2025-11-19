@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Epic, Hint, Project, Task } from "@/lib/mock-data";
 import { database } from "@/lib/mock-data";
+import { DEFAULT_BOARD_COLUMNS } from "@/lib/board/constants";
 
 interface GeneratingProps {
   open: boolean;
@@ -36,16 +37,32 @@ interface TaskData {
   id: string;
   title: string;
   description?: string;
+  sprintId?: string;
   hints?: TaskHints;
 }
 
 interface EpicData {
   id: string;
   title: string;
+  description?: string;
   tasks: TaskData[];
 }
 
+interface SprintData {
+  id: string;
+  name: string;
+  goal: string;
+  tasks: string[];
+}
+
+interface ProjectMetadata {
+  title: string;
+  description: string;
+}
+
 interface PlanResponse {
+  project?: ProjectMetadata;
+  sprints?: SprintData[];
   epics: EpicData[];
 }
 
@@ -103,17 +120,24 @@ export function Generating({ open, briefContent }: GeneratingProps) {
   const [progress, setProgress] = useState(0);
   const [tips, setTips] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [targetProgress, setTargetProgress] = useState(0);
 
-  const updateProgressForStep = useCallback(
-    (stepIndex: number, totalSteps: number) => {
-      // Calculate progress based on current step
-      const baseProgress = (stepIndex / totalSteps) * 100;
-      // Add some incremental progress within the step
-      const incrementalProgress = (1 / totalSteps) * 50; // 50% of step progress
-      setProgress(Math.min(baseProgress + incrementalProgress, 100));
-    },
-    []
-  );
+  // Animate progress smoothly to target
+  useEffect(() => {
+    if (!isGenerating) return;
+
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= targetProgress) return prev;
+        const diff = targetProgress - prev;
+        // Increase by 1-3% per tick, depending on remaining distance
+        const increment = Math.min(Math.max(diff * 0.1, 0.5), 3);
+        return Math.min(prev + increment, targetProgress);
+      });
+    }, 50); // Update every 50ms for smooth animation
+
+    return () => clearInterval(interval);
+  }, [isGenerating, targetProgress]);
 
   const handleGeneratePlan = useCallback(async () => {
     if (!briefContent?.trim()) {
@@ -124,12 +148,13 @@ export function Generating({ open, briefContent }: GeneratingProps) {
     setIsGenerating(true);
     setCurrentStep(0);
     setProgress(0);
+    setTargetProgress(0);
     toast.loading("Generating project plan...", { id: "generating" });
 
     try {
       // Step 1: Analyze brief
       setCurrentStep(0);
-      updateProgressForStep(0, GENERATION_STEPS.length);
+      setTargetProgress(20); // Start at 20% for step 1
 
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -146,9 +171,9 @@ export function Generating({ open, briefContent }: GeneratingProps) {
         throw new Error(errorData.error || "Failed to generate plan");
       }
 
-      // Step 2: Create epics
+      // Step 2: Create epics (while waiting for response, progress animates to 20%)
       setCurrentStep(1);
-      updateProgressForStep(1, GENERATION_STEPS.length);
+      setTargetProgress(40);
 
       const plan: PlanResponse = await response.json();
 
@@ -166,12 +191,14 @@ export function Generating({ open, briefContent }: GeneratingProps) {
         });
       }
 
-      // Generate project title from first epic or use brief preview
-      const projectTitle =
-        plan.epics.length > 0
+      // Use project title and description from API, or fallback to brief
+      const projectTitle = plan.project?.title || 
+        (plan.epics.length > 0
           ? plan.epics[0].title
           : briefContent.trim().slice(0, 50) +
-            (briefContent.trim().length > 50 ? "..." : "");
+            (briefContent.trim().length > 50 ? "..." : ""));
+      
+      const projectDescription = plan.project?.description || briefContent.trim();
 
       const project: Project = {
         id: projectId,
@@ -183,9 +210,21 @@ export function Generating({ open, briefContent }: GeneratingProps) {
 
       database.setProject(project);
 
+      // Store sprints if provided
+      if (plan.sprints && plan.sprints.length > 0) {
+        // Sprints will be stored in localStorage along with project data
+        // We'll create a proper sprint storage system in the database layer later
+      }
+
       // Step 3: Create tasks
       setCurrentStep(2);
-      updateProgressForStep(2, GENERATION_STEPS.length);
+      setTargetProgress(60);
+
+      const defaultColumns = DEFAULT_BOARD_COLUMNS.map((column) => ({
+        ...column,
+      }));
+      const defaultBoardColumnId = defaultColumns[0]?.id ?? "todo";
+      const taskStatusMap: Record<string, string> = {};
 
       // Process epics and tasks
       plan.epics.forEach((epicData: EpicData, epicIndex: number) => {
@@ -210,6 +249,8 @@ export function Generating({ open, briefContent }: GeneratingProps) {
             updatedAt: new Date().toISOString(),
           };
           database.setTask(task);
+
+          taskStatusMap[task.id] = defaultBoardColumnId;
 
           // Process hints from API response
           if (taskData.hints) {
@@ -238,14 +279,25 @@ export function Generating({ open, briefContent }: GeneratingProps) {
 
       // Step 4: Create hints (already done above, but we update step)
       setCurrentStep(3);
-      updateProgressForStep(3, GENERATION_STEPS.length);
+      setTargetProgress(80);
 
       // Save raw plan data to localStorage for backup
       if (typeof window !== "undefined") {
         localStorage.setItem(
           `mengo_project_${projectId}`,
           JSON.stringify({
-            plan,
+            plan: {
+              project: {
+                title: projectTitle,
+                description: projectDescription,
+              },
+              sprints: plan.sprints || [],
+              epics: plan.epics,
+            },
+            board: {
+              columns: defaultColumns,
+              taskStatuses: taskStatusMap,
+            },
             briefContent: briefContent.trim(),
             createdAt: new Date().toISOString(),
           })
@@ -260,7 +312,7 @@ export function Generating({ open, briefContent }: GeneratingProps) {
 
       // Step 5: Finalize
       setCurrentStep(4);
-      setProgress(100);
+      setTargetProgress(100);
 
       toast.success("Project plan generated successfully!", {
         id: "generating",
@@ -279,9 +331,10 @@ export function Generating({ open, briefContent }: GeneratingProps) {
       toast.error(errorMessage, { id: "generating" });
       setIsGenerating(false);
       setProgress(0);
+      setTargetProgress(0);
       setCurrentStep(0);
     }
-  }, [briefContent, router, updateProgressForStep]);
+  }, [briefContent, router]);
 
   useEffect(() => {
     if (!open) {
@@ -289,6 +342,7 @@ export function Generating({ open, briefContent }: GeneratingProps) {
       const timeoutId = setTimeout(() => {
         setCurrentStep(0);
         setProgress(0);
+        setTargetProgress(0);
         setTips([]);
         setIsGenerating(false);
       }, 0);
